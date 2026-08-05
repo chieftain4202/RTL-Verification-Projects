@@ -1,0 +1,7 @@
+0.7
+2020.2
+Nov 18 2020
+09:47:47
+d:/Project_1/20260309_RV32I_S/20260309_RV32I_S.srcs/sources_1/new/RV32I_top.sv,1780274856,systemVerilog,,,,rv32I_top,,,,,,,,
+d:/Project_1/20260309_RV32I_S/20260309_RV32I_S.srcs/sources_1/new/define.vh,1773663338,verilog,,,,,,,,,,,,
+d:/Project_1/20260309_RV32I_S/20260309_RV32I_S.srcs/sources_1/new/rv32i_cpu.sv,1774486953,systemVerilog,,,d:/Project_1/20260309_RV32I_S/20260309_RV32I_S.srcs/sources_1/new/define.vh,control_unit;rv32i_cpu,,,,,,,,

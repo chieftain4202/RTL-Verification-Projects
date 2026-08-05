@@ -1,0 +1,21 @@
+
+100007b7  // lui  x15, 0x10000      ; x15 = 0x10000000
+04100713  // addi x14, x0, 65       ; x14 = 65 ('A')
+00e7a023  // sw   x14, 0(x15)       ; mem[x15 + 0] = x14
+00000013  // addi x0, x0, 0         ; nop
+0007a683
+
+
+
+10000137  // lui  x2, 0x10000       ; x2 = 0x10000000
+40010113  // addi x2, x2, 1024      ; x2 = x2 + 0x400
+ff010113  // addi x2, x2, -16       ; x2 = x2 - 16, stack/frame 공간 확보
+00112623  // sw   x1, 12(x2)        ; return address 저장
+00812423  // sw   x8, 8(x2)         ; saved register x8 저장
+01010413  // addi x8, x2, 16        ; frame pointer 설정
+
+
+00c12083  // lw   x1, 12(x2)        ; return address 복구
+00812403  // lw   x8, 8(x2)         ; saved register x8 복구
+01010113  // addi x2, x2, 16        ; stack/frame 복원
+00008067  // jalr x0, 0(x1)         ; return

@@ -1,0 +1,64 @@
+# Vivado generated files
+.Xil/
+*.cache/
+*.gen/
+*.hw/
+*.ip_user_files/
+*.runs/
+*.sim/
+*.tmp/
+*.jou
+*.log
+*.str
+*.wdb
+*.vcd
+*.bit
+*.ltx
+*.xsa
+
+# VCS / Verdi generated files
+csrc/
+simv
+simv.*
+*.daidir/
+*.vdb/
+DVEfiles/
+verdiLog/
+vdCovLog/
+novas.*
+*.fsdb
+*.sdb
+ucli.key
+cm.log
+tr_db.log
+
+# Vitis / compiled outputs
+.metadata/
+Debug/
+Release/
+*.o
+*.d
+*.a
+*.so
+*.elf
+*.bin
+*.pdom
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# AI model binaries
+*.engine
+*.onnx
+*.pt
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+~$*
+
