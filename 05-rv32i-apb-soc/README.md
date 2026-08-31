@@ -4,9 +4,43 @@ Multi-Cycle RV32I CPU와 APB Master, BRAM, GPIO, FND, UART Peripheral을 통합�
 
 C Firmware를 Machine Code로 변환해 Instruction Memory에 적재하고, CPU가 Memory-Mapped APB Register를 통해 GPIO와 FND를 제어하는 FPGA 기반 SoC를 구현했습니다.
 
-## Architecture
+## System Architecture
 
-명령어 실행을 여러 Clock Cycle에 걸쳐 처리하도록 CPU를 구성했습니다.
+<div align="center">
+  <img width="677" alt="RV32I Multi-Cycle SoC with AMBA APB Block Diagram" src="https://github.com/user-attachments/assets/6402f998-71ef-4a33-9439-83b0da408a78" />
+  <br>
+  <sub>RV32I CPU, APB Master, Address Decoder와 Memory-Mapped Peripheral의 통합 구조</sub>
+</div>
+
+RV32I CPU에서 발생한 Instruction Fetch 요청은 Instruction Memory로 전달됩니다. Load/Store 명령에서 발생한 Data Memory 요청은 APB Master로 전달되며, Address Decoder가 주소 범위에 따라 BRAM, GPIO, FND 또는 UART를 선택합니다.
+
+```text
+Instruction Memory
+        ↓
+Multi-Cycle RV32I CPU
+        ↓ Load / Store Request
+     APB Master
+        ↓
+  Address Decoder
+        ├─ BRAM
+        ├─ GPIO
+        ├─ FND
+        └─ UART
+```
+
+CPU는 Memory-Mapped Address를 사용하므로 일반 메모리와 주변장치를 동일한 Load/Store 명령으로 접근할 수 있습니다.
+
+## RV32I Multi-Cycle CPU
+
+<div align="center">
+  <img width="667" alt="RV32I Multi-Cycle CPU Datapath Block Diagram" src="https://github.com/user-attachments/assets/2c102f16-41da-494c-9805-288d112481ea" />
+  <br>
+  <sub>Control Unit, Register File, ALU, Immediate Generator와 Memory Interface로 구성한 Multi-Cycle Datapath</sub>
+</div>
+
+Multi-Cycle 구조는 하나의 명령어를 한 Clock에 모두 처리하지 않고, 명령어 처리 과정을 여러 상태로 나누어 실행합니다.
+
+각 상태에서는 Datapath의 일부만 사용하며, Control Unit이 현재 상태와 `Opcode`, `Funct3`, `Funct7`을 기준으로 ALU 선택, Register Write, Memory Access와 PC 갱신 신호를 생성합니다.
 
 ```text
 FETCH
@@ -16,7 +50,50 @@ FETCH
   → WRITE BACK
 ```
 
-CPU의 Load/Store 요청은 APB Master로 전달되며, APB Transaction은 다음 상태에 따라 진행됩니다.
+Single-Cycle 구조는 가장 긴 명령어 경로에 Clock 주기를 맞춰야 하지만, Multi-Cycle 구조는 연산을 여러 단계로 분리하여 각 단계의 조합논리 경로를 줄일 수 있습니다. 또한 ALU와 같은 연산 자원을 여러 상태에서 재사용할 수 있습니다.
+
+대신 명령어 하나를 완료하는 데 여러 Clock이 필요하며, 명령어 종류에 따라 거치는 상태와 CPI가 달라집니다.
+
+### Instruction Execution Stages
+
+| Stage | 주요 동작 |
+|---|---|
+| `FETCH` | PC를 Instruction Memory 주소로 전달하고 명령어를 읽음 |
+| `DECODE` | Opcode와 Function Field를 해석하고 Register File의 `rs1`, `rs2`를 읽음 |
+| `EXECUTE` | ALU 연산, Memory Address 계산, Branch 비교 또는 Jump Target 계산 |
+| `MEMORY` | Load/Store 명령의 BRAM 또는 APB Peripheral Read/Write 수행 |
+| `WRITE BACK` | ALU 결과나 Load 데이터를 목적 Register `rd`에 기록 |
+
+### Instruction-Type State Flow
+
+| Instruction Type | 주요 상태 흐름 |
+|---|---|
+| R-Type | Fetch → Decode → ALU Execute → Write Back |
+| I-Type Arithmetic | Fetch → Decode → Immediate ALU Execute → Write Back |
+| Load | Fetch → Decode → Address Calculate → Memory Read → Write Back |
+| Store | Fetch → Decode → Address Calculate → Memory Write |
+| Branch | Fetch → Decode → Compare → 조건에 따른 PC 갱신 |
+| JAL/JALR | Fetch → Decode → Jump Target 계산 → PC 및 `rd` 갱신 |
+| LUI/AUIPC | Fetch → Decode → Immediate/PC 연산 → Write Back |
+
+### Main Datapath Components
+
+| Component | 역할 |
+|---|---|
+| Program Counter | 현재 명령어 주소 유지 및 다음 PC 갱신 |
+| Instruction Memory | PC에 해당하는 Machine Code 출력 |
+| Control Unit | 명령어와 현재 State에 따른 제어 신호 생성 |
+| Register File | `rs1`, `rs2` Operand Read와 `rd` Result Write |
+| Immediate Generator | 명령어 Type별 Immediate 확장 |
+| ALU | 산술·논리 연산, 주소와 Branch Target 계산 |
+| ALU Result Register | 여러 Cycle 사이에서 ALU 결과 유지 |
+| Load Data Register | Memory Read 데이터를 Write Back 단계까지 유지 |
+| Data Memory Interface | BRAM 또는 APB Master로 Load/Store 요청 전달 |
+| Write-Back MUX | ALU Result, Load Data, PC+4 중 Register 입력 선택 |
+
+## APB Transaction
+
+CPU의 Load/Store 요청이 Peripheral 주소를 대상으로 하면 APB Master가 APB Transaction을 시작합니다.
 
 ```text
 IDLE
@@ -26,11 +103,35 @@ IDLE
   → IDLE
 ```
 
-### Key Features
+### APB State Operation
+
+| State | 주요 동작 |
+|---|---|
+| `IDLE` | Transaction 요청을 기다림 |
+| `SETUP` | `PADDR`, `PWRITE`, `PWDATA`, `PSEL` 설정 |
+| `ACCESS` | `PENABLE`을 활성화하고 Slave 응답 대기 |
+| Wait State | `PREADY=0`이면 ACCESS 상태와 제어 신호 유지 |
+| Complete | `PREADY=1`이면 Read/Write 완료 후 IDLE 복귀 |
+
+### APB Signals
+
+| Signal | 역할 |
+|---|---|
+| `PADDR` | Peripheral과 내부 Register 주소 |
+| `PSEL` | Address Decoder가 선택한 APB Slave 활성화 |
+| `PENABLE` | APB ACCESS Phase 표시 |
+| `PWRITE` | `1`: Write, `0`: Read |
+| `PWDATA` | APB Write Data |
+| `PRDATA` | APB Read Data |
+| `PREADY` | Slave의 Transaction 완료 응답 |
+
+## Key Features
 
 - Fetch, Decode, Execute, Memory, Write Back 기반 Multi-Cycle CPU
+- 명령어 Type별 상태 전이와 Control Signal 생성
+- Register File, Immediate Generator, ALU와 Memory Interface 구성
 - APB IDLE, SETUP, ACCESS State Machine
-- `PREADY` 응답을 고려한 APB Transaction
+- `PREADY` 응답과 Wait State를 고려한 APB Transaction
 - Address Decoder를 이용한 Peripheral 선택
 - Memory-Mapped BRAM 및 Peripheral Register
 - C Firmware 기반 GPIO/FND 제어
