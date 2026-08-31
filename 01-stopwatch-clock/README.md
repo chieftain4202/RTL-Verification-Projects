@@ -20,6 +20,8 @@ FSM과 Datapath를 분리해 Stopwatch와 Clock 동작을 구현하고, Basys 3�
 버튼과 스위치 입력에 따른 Stopwatch의 Run·Stop 동작 및 7-segment display 출력 변화를 Basys 3 보드에서 확인했습니다.
 
 ![Basys 3 Stopwatch 동작 검증](./docs/images/basys3_stopwatch_demo.gif)
+<img width="480" height="376" alt="basys3_stopwatch_demo" src="https://github.com/user-attachments/assets/72fabdcd-cfde-40d6-92f9-02260c2f5a15" />
+
 
 ## Structure
 
