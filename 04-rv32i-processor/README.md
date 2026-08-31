@@ -118,7 +118,7 @@ C 코드에서 변환한 Machine Code를 ROM에 적재한 후, Program Counter�
 
 Instruction Address의 진행과 함께 Register File 상태를 확인하여, 각 명령어의 Source Register와 Destination Register가 의도한 순서로 사용되는지 검증했습니다.
 
-특히 반복문의 Index 증가, `adder()` 함수의 Argument 전달, 덧셈 결과 반환 및 누적값 갱신 과정을 추적했습니다. 최종적으로 예상 누적 결과인 `78`과 Register 또는 Memory에 저장된 실행 결과를 비교했습니다.
+특히 반복문의 Index 증가, `adder()` 함수의 Argument 전달, 덧셈 결과 반환 및 누적값 갱신 과정을 추적했습니다.
 
 <img width="915" alt="RV32I Adder Test Register File State" src="https://github.com/user-attachments/assets/2e677039-15a5-462c-8edd-fe329e11a5f2" />
 
