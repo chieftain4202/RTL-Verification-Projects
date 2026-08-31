@@ -15,9 +15,9 @@ Multi-cycle RV32I CPU, APB Master, BRAM, GPIO, FND, UART peripheral을 통합한
 | Peripheral | Address Range | Size |
 |---|---:|---:|
 | BRAM | `0x1000_0000`-`0x1000_0FFF` | 4 KB |
-| GPIO | `0x2000_0000`-`0x2000_0FFF` | 4 KB |
-| FND | `0x2000_1000`-`0x2000_1FFF` | 4 KB |
-| UART | `0x2000_2000`-`0x2000_2FFF` | 4 KB |
+| GPIO | `0x2000_2000`-`0x2000_2FFF` | 4 KB |
+| FND | `0x2000_3000`-`0x2000_3FFF` | 4 KB |
+| UART | `0x2000_4000`-`0x2000_4FFF` | 4 KB |
 
 ## Personal Contribution
 
