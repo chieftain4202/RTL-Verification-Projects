@@ -35,9 +35,6 @@ docs/
     Uart_Clock.pptx
 ```
 
-## Simulation Verification
-
-<img width="360" height="640" alt="uart_clock_demo" src="https://github.com/user-attachments/assets/b486cd25-5ef4-4820-85b6-cba050c242fd" />
 
 ### UART TX Waveform
 
@@ -55,7 +52,7 @@ UART TX가 Start Bit, 8-bit Data, Stop Bit 순서로 데이터를 전송하는�
 
 Serial Terminal에서 전송한 ASCII 명령에 따라 Clock의 시간 설정값이 변경되고, Stopwatch의 Run/Stop 및 Clear 동작이 수행되는 것을 Basys 3 보드에서 확인했습니다.
 
-<img src="./docs/images/uart_clock_demo.gif" width="360" alt="UART Clock 및 Stopwatch FPGA 동작 검증" />
+<img width="360" height="640" alt="uart_clock_demo" src="https://github.com/user-attachments/assets/b486cd25-5ef4-4820-85b6-cba050c242fd" />
 
 ## Portability Note
 
