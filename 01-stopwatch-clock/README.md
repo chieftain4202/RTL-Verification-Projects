@@ -27,9 +27,8 @@ Vivado 프로젝트를 새로 만들 때 RTL과 XDC를 source로 추가해 사�
 
 ## Verification Evidence to Add
 
-- Run/Stop/Clear waveform
-- Counter boundary test
-- Basys 3 동작 사진 또는 영상![Uploading image.png…]()
+<img width="1041" height="533" alt="image" src="https://github.com/user-attachments/assets/6332d2cb-dc05-4947-a353-e82d371b6bf3" />
+
 
 
 ## Original Artifacts
