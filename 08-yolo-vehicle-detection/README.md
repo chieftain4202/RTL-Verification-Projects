@@ -299,7 +299,7 @@ flowchart TD
 ### Stopped-Vehicle Detection Result
 
 <div align="center">
-  <img width="1000" alt="Stopped vehicle detection result" src="./docs/images/stopped_vehicle_detection.png" />
+  <img width="1471" height="922" alt="image" src="https://github.com/user-attachments/assets/79f0fa34-9e90-48ed-9c92-e71d569e98df" />
 </div>
 
 각 차량의 Track ID와 중심 좌표를 기준으로 정지 시간을 누적하고, 조건을 만족한 차량을 빨간색 `EMERGENCY` Box로 표시했습니다.
