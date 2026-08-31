@@ -201,26 +201,18 @@ flowchart LR
 
 사용자가 지정한 차선 범위 안에 Bounding Box 중심점이 들어오면 해당 차량을 집계합니다. Track ID를 기준으로 처리하므로 같은 차량이 여러 프레임에서 반복 검출되더라도 한 번만 누적됩니다.
 
-## Stopped-Vehicle Detection
+### Stopped-Vehicle Detection Test
 
-ByteTrack ID별로 기준 중심 좌표와 정지 시작 시각을 기록합니다.
+Tracking ID별 차량 중심 좌표를 기록하고, 기준 위치에서 이동량이 20px 이하인 상태가 5초 이상 지속되면 정차 이벤트로 판정합니다.
 
-```mermaid
-flowchart TD
-    TRACK["Tracked Vehicle"] --> STATE{"기존 Track ID?"}
-    STATE -->|No| INIT["기준 중심점과<br/>시작 시각 저장"]
-    STATE -->|Yes| MOVE{"기준 위치에서<br/>20px 초과 이동?"}
+| 검증 항목 | 적용 기준 |
+|---|---:|
+| 정차 유지 시간 | 5초 이상 |
+| 허용 이동 범위 | 기준점으로부터 20px 이하 |
+| Track 유지 시간 | 5초 |
+| 정체 예외 조건 | 화면 내 차량 8대 이상 |
 
-    MOVE -->|Yes| RESET["기준점 갱신<br/>정지 시간 초기화"]
-    MOVE -->|No| TIMER["정지 시간 누적"]
-
-    TIMER --> LIMIT{"5초 이상?"}
-    LIMIT -->|No| TRACK
-    LIMIT -->|Yes| CONGESTION{"화면 차량 수<br/>8대 이상?"}
-
-    CONGESTION -->|Yes| SUPPRESS["정체 구간으로 판단<br/>개별 경고 억제"]
-    CONGESTION -->|No| ALERT["EMERGENCY 표시<br/>이벤트 이미지 저장"]
-```
+> 시연에서는 정차 상황을 재현하기 위해 입력 영상을 일시정지했습니다. 이는 정차 판정 로직의 동작을 확인하기 위한 테스트이며, 실제 도로 환경에서의 불법 주정차 판정을 의미하지 않습니다.
 
 ### Decision Conditions
 
