@@ -122,6 +122,16 @@ Instruction Address의 진행과 함께 Register File 상태를 확인하여, �
 
 <img width="915" alt="RV32I Adder Test Register File State" src="https://github.com/user-attachments/assets/2e677039-15a5-462c-8edd-fe329e11a5f2" />
 
+
+## C Test Program 누적 연산 결과
+
+C Test Program에서 반복문과 `adder()` 함수를 실행하고, Register File의 값이 누적되는 과정을 Simulation 파형으로 확인했습니다.
+
+RISC-V 호출 규약에 따라 `x10(a0)`은 함수의 첫 번째 인자와 반환값으로 사용되고, `x11(a1)`은 두 번째 인자를 전달합니다. 파형에서 `x11`에는 호출 직전의 누적값 `55`가 전달되며, `adder()` 실행 후 최종 계산 결과인 `66 (0x00000042)`이 `x10`에 반환되는 것을 확인했습니다.
+
+<img width="1124" height="529" alt="image" src="https://github.com/user-attachments/assets/6398446e-36c0-4e0a-a9df-891d96b677a8" />
+
+
 ## Original Artifacts
 
 - [Vivado XPR](./vivado/original-project/20260309-rv32i/20260309_RV32I_S.xpr)
