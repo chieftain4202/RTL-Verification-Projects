@@ -71,13 +71,6 @@ flowchart LR
 
 SPI Master는 `CPOL=0`, `CPHA=0`의 Mode 0으로 동작하며 `clk_div=4`를 적용합니다. `CS_n`을 Low로 내린 뒤 송신 Shift Register의 MSB부터 MOSI로 출력하고, SCLK Edge에서 MISO를 8-bit 수신 Shift Register에 저장합니다. 전송이 끝나면 `CS_n`을 High로 복귀하고 수신값을 `master_rx_data`에 반영합니다.
 
-### SPI RTL Files
-
-| 파일 | 역할 |
-|---|---|
-| [SPI_Master_v1_0.v](./rtl/custom-ip/spi-master/SPI_Master_v1_0.v) | AXI4-Lite Slave와 SPI Master/FND RTL을 연결하는 Custom IP 상위 Wrapper |
-| [SPI_Master_v1_0_S00_AXI.v](./rtl/custom-ip/spi-master/SPI_Master_v1_0_S00_AXI.v) | AXI4-Lite Write/Read Channel과 4개의 32-bit Slave Register 구현 |
-| [spi_master.sv](./rtl/custom-ip/spi-master/spi_master.sv) | SPI Mode 0 송수신 FSM, Clock Divider, Shift Register 및 FND 표시 구현 |
 
 ### AXI-SPI Register Map
 
