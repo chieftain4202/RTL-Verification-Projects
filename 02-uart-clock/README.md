@@ -65,4 +65,4 @@ Serial Terminal에서 전송한 ASCII 명령에 따라 Clock의 시간 설정값
 ## Original Artifacts
 
 - [Vivado XPR](<./vivado/original-project/20260206-uart-stopwatch/20260206 Uart_Stopwatch_project.xpr>)
-- [발표자료](./docs/presentation/Uart_Clock.pptx)!
+- [발표자료](./docs/presentation/Uart_Clock.pptx)
