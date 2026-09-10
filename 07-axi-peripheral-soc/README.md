@@ -135,6 +135,16 @@ AXI-SPI 구성에서 MicroBlaze가 `slv_reg0[7:0]`에 기록한 데이터를 MOS
 
 ## Current I2C Hardware/Software Control Flow
 
+### I2C RTL Files
+
+| 파일 | 역할 |
+|---|---|
+| [i2c_masterr_v1_0.v](./rtl/custom-ip/i2c-master/i2c_masterr_v1_0.v) | AXI4-Lite Slave와 I2C Master/FND RTL을 연결하고 SCL·SDA를 외부로 출력하는 Custom IP 상위 Wrapper |
+| [i2c_masterr_v1_0_S00_AXI.v](./rtl/custom-ip/i2c-master/i2c_masterr_v1_0_S00_AXI.v) | AXI4-Lite Write/Read Channel, 제어·송신 Register와 상태 Register Read 경로 구현 |
+| [master.sv](./rtl/custom-ip/i2c-master/master.sv) | START·Address·Write Data·STOP 제어, I2C 송수신 FSM, 상태값 생성 및 FND 표시 구현 |
+
+`i2c_masterr_v1_0_S00_AXI`는 `slv_reg0[15:0]`을 I2C 제어값과 송신 데이터로 전달하고, `+0x04` Read 요청에는 `master_top`에서 생성한 FSM·Busy·Done·ACK 상태값을 반환합니다.
+
 ```mermaid
 flowchart TB
     MAIN["main.c"] --> INIT["CommTest_Init()"]
