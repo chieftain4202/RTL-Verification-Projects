@@ -79,7 +79,7 @@ void main(void)
     int i = 0;
     int sum = 0;
 
-    while (i < 12) {
+    while (i < 11) {
         i = i + 1;
         sum = adder(i, sum);
     }
@@ -102,7 +102,7 @@ C Source
   → RTL Simulation
 ```
 
-반복문에서 1부터 12까지 누적하므로 최종 예상값은 `78 (0x0000004E)`입니다. 이를 기준으로 Program Counter의 명령어 진행, 함수 호출과 복귀, Register File 및 Memory의 상태 변화를 확인했습니다.
+반복문에서 1부터 11까지 누적하므로 최종 예상값은 `66`입니다. 이를 기준으로 Program Counter의 명령어 진행, 함수 호출과 복귀, Register File 및 Memory의 상태 변화를 확인했습니다.
 
 사용한 ROM 초기화 데이터는 [Rivc_V_rv32_rom.mem](./memory/Rivc_V_rv32_rom.mem)에서 확인할 수 있습니다.
 
