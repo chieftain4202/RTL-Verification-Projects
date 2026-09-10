@@ -71,6 +71,39 @@ flowchart LR
 
 SPI Master는 `CPOL=0`, `CPHA=0`의 Mode 0으로 동작하며 `clk_div=4`를 적용합니다. `CS_n`을 Low로 내린 뒤 송신 Shift Register의 MSB부터 MOSI로 출력하고, SCLK Edge에서 MISO를 8-bit 수신 Shift Register에 저장합니다. 전송이 끝나면 `CS_n`을 High로 복귀하고 수신값을 `master_rx_data`에 반영합니다.
 
+### SPI RTL Files
+
+| 파일 | 역할 |
+|---|---|
+| [SPI_Master_v1_0.v](./rtl/custom-ip/spi-master/SPI_Master_v1_0.v) | AXI4-Lite Slave와 SPI Master/FND RTL을 연결하는 Custom IP 상위 Wrapper |
+| [SPI_Master_v1_0_S00_AXI.v](./rtl/custom-ip/spi-master/SPI_Master_v1_0_S00_AXI.v) | AXI4-Lite Write/Read Channel과 4개의 32-bit Slave Register 구현 |
+| [spi_master.sv](./rtl/custom-ip/spi-master/spi_master.sv) | SPI Mode 0 송수신 FSM, Clock Divider, Shift Register 및 FND 표시 구현 |
+
+### AXI-SPI Software Control Flow
+
+SPI Driver는 Base Address를 저장한 뒤 `Xil_Out32()`와 `Xil_In32()`로 AXI-SPI Register에 접근하도록 구성했습니다. [SPIMaster.c](./sw/Driver/SPIMaster/SPIMaster.c)와 [SPIMaster.h](./sw/Driver/SPIMaster/SPIMaster.h)에서 구현을 확인할 수 있습니다.
+
+```mermaid
+flowchart TD
+    INIT["SPIMaster_Init()<br/>Base Address 저장"] --> CALL["SPIMaster_SendByte()<br/>8-bit TX Data 전달"]
+    CALL --> TX["SPIMaster_WriteTxData()"]
+    TX --> REG0["Xil_Out32()<br/>Base + 0x00에 TX Data 기록"]
+    REG0 --> START["SPIMaster_Start()"]
+    START --> REG1["Xil_Out32()<br/>Base + 0x04에 1 기록"]
+
+    READ["SPIMaster_ReadReg()"] --> AXI_R["Xil_In32()<br/>Base + Register Offset"]
+    AXI_R --> VALUE["32-bit Register 값 반환"]
+```
+
+| 순서 | 함수 | Software 동작 |
+|---:|---|---|
+| 1 | `SPIMaster_Init()` | AXI-SPI Base Address를 Driver Handle에 저장 |
+| 2 | `SPIMaster_SendByte()` | 송신 데이터 기록과 Start 함수 순차 호출 |
+| 3 | `SPIMaster_WriteTxData()` | 8-bit TX Data를 `Base + 0x00`에 기록 |
+| 4 | `SPIMaster_Start()` | 제어값 `1`을 `Base + 0x04`에 기록 |
+| 5 | `SPIMaster_ReadReg()` | 지정한 Offset의 32-bit Register 값 반환 |
+
+이 흐름은 공개된 SPI Driver의 Software 동작을 나타냅니다. 현재 공개된 `main.c`는 AXI-I2C `CommTest`를 실행하므로 SPI Driver를 직접 호출하지 않으며, SPI 실행 Application은 별도로 구성해야 합니다.
 
 ### AXI-SPI Register Map
 
@@ -94,7 +127,7 @@ SPI Master는 `CPOL=0`, `CPHA=0`의 Mode 0으로 동작하며 `clk_div=4`를 적
 | 5 | `SPI_master` FSM | 수신 데이터를 `master_rx_data`에 저장하고 `CS_n` 비활성화 |
 | 6 | `fnd_controller` | 수신한 8-bit 값을 10진수 Digit으로 분리해 FND에 표시 |
 
-현재 공개된 SPI RTL에서는 `slv_reg1`을 Start 신호로 사용하지 않고, SPI FSM의 IDLE/Busy 상태에 따라 전송을 진행합니다. 따라서 [SPIMaster.c](./sw/Driver/SPIMaster/SPIMaster.c)의 `+0x00` TX Data Write는 RTL과 대응하지만, `+0x04`에 기록하는 `SPIMaster_Start()`는 현재 공개된 RTL 제어 경로에는 연결되어 있지 않습니다. 공개된 `main.c`는 AXI-I2C `CommTest` 실행 경로이며 SPI Driver는 별도 소프트웨어 구현 자료로 보존했습니다.
+현재 공개된 SPI RTL에서는 `slv_reg1`을 Start 신호로 사용하지 않고, SPI FSM의 IDLE/Busy 상태에 따라 전송을 진행합니다. 따라서 `+0x00` TX Data Write는 RTL과 대응하지만, `+0x04`에 기록하는 `SPIMaster_Start()`는 현재 공개된 RTL 제어 경로에는 연결되어 있지 않습니다.
 
 ### SPI FPGA Integration Result
 
@@ -257,6 +290,33 @@ vivado/block-design/   Block Design과 XCI Metadata
 vivado/ip-package/     Custom IP Packaging Metadata
 ```
 
+## FPGA Prototype
+
+SPI와 I2C는 각각의 FPGA 구성에서 Master와 Slave 사이의 데이터 전송을 확인했습니다. 현재 공개된 `main.c`의 실행 경로는 AXI-I2C와 GPIO를 사용하는 `CommTest` 구성입니다.
+
+<table>
+  <tr>
+    <th>AXI-SPI FPGA 동작</th>
+    <th>AXI-I2C FPGA 동작</th>
+  </tr>
+  <tr>
+    <td align="center">
+      <img width="280" alt="AXI SPI FPGA Demo" src="https://github.com/user-attachments/assets/bacf0a67-eb09-4e82-86d4-23f0efb0493f">
+    </td>
+    <td align="center">
+      <img width="480" alt="AXI I2C FPGA Demo" src="https://github.com/user-attachments/assets/ff9d2524-5f26-45a5-8d8a-2baee028adfa">
+    </td>
+  </tr>
+  <tr>
+    <td>
+      별도의 AXI-SPI 구성에서 MicroBlaze가 SPI Master Register를 제어하고, FPGA 보드 간 송수신 동작을 확인했습니다.
+    </td>
+    <td>
+      현재 CommTest 구성에서 GPIO 입력값을 AXI-I2C Register에 기록하고, I2C Write Transaction과 상태 변화를 확인했습니다.
+    </td>
+  </tr>
+</table>
+
 ## AXI-I2C UVM Verification
 
 현재 공개된 UVM Testbench는 보드에서 실행되는 `CommTest`와 분리된 검증 환경이며, `rtl/uvm-design`의 AXI-I2C Custom IP를 대상으로 Write/Read 데이터 경로를 검증합니다.
@@ -364,33 +424,6 @@ Simulation 종료 시 Write/Read 경로의 비교 결과와 PASS/ERROR Count를 
     </td>
     <td align="center">
       <img width="380" alt="AXI I2C Data Coverage 00 to FF Part 2" src="https://github.com/user-attachments/assets/ae148481-7b58-44f9-b510-3a19dffad74b">
-    </td>
-  </tr>
-</table>
-
-## FPGA Prototype
-
-SPI와 I2C는 각각의 FPGA 구성에서 Master와 Slave 사이의 데이터 전송을 확인했습니다. 현재 공개된 `main.c`의 실행 경로는 AXI-I2C와 GPIO를 사용하는 `CommTest` 구성입니다.
-
-<table>
-  <tr>
-    <th>AXI-SPI FPGA 동작</th>
-    <th>AXI-I2C FPGA 동작</th>
-  </tr>
-  <tr>
-    <td align="center">
-      <img width="280" alt="AXI SPI FPGA Demo" src="https://github.com/user-attachments/assets/bacf0a67-eb09-4e82-86d4-23f0efb0493f">
-    </td>
-    <td align="center">
-      <img width="480" alt="AXI I2C FPGA Demo" src="https://github.com/user-attachments/assets/ff9d2524-5f26-45a5-8d8a-2baee028adfa">
-    </td>
-  </tr>
-  <tr>
-    <td>
-      별도의 AXI-SPI 구성에서 MicroBlaze가 SPI Master Register를 제어하고, FPGA 보드 간 송수신 동작을 확인했습니다.
-    </td>
-    <td>
-      현재 CommTest 구성에서 GPIO 입력값을 AXI-I2C Register에 기록하고, I2C Write Transaction과 상태 변화를 확인했습니다.
     </td>
   </tr>
 </table>
