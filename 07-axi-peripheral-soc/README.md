@@ -70,7 +70,7 @@ SPI Master Driver는 Base Address와 Register Offset을 이용해 송신 데이�
 | [SPI_top.sv](./rtl/spi/SPI_top.sv) | Master·Slave·FND 연결과 버튼·스위치 제어 |
 | [fnd_controller.sv](./rtl/spi/fnd_controller.sv) | 수신 데이터 저장 및 FND 표시 |
 
-`SPI_top`은 일반 SPI 동작을 확인하는 독립 Top입니다. 이전 AXI-SPI 구현에 사용된 RTL과 동일한 버전인지는 확정하지 않았습니다. I2C 소스와 일부 모듈명이 겹치므로 별도 Source Set으로 사용합니다.
+`SPI_top`은 일반 SPI 동작을 확인하는 독립 Top입니다.
 
 ### SPI Driver Functions
 
@@ -82,7 +82,6 @@ SPI Master Driver는 Base Address와 Register Offset을 이용해 송신 데이�
 | `SPIMaster_SendByte()` | 송신 데이터 기록 후 시작 제어를 순서대로 수행 |
 | `SPIMaster_ReadReg()` | 지정 Offset의 32-bit Register 값 반환 |
 
-`SPIMaster_Init()`은 주소를 저장하는 함수이며, 하드웨어 Reset이나 SPI Mode 설정은 수행하지 않습니다. Register 접근에는 `Xil_Out32()`와 `Xil_In32()`를 직접 사용합니다.
 
 ### SPI Register Access Flow
 
