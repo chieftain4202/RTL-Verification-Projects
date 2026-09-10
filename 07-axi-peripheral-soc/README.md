@@ -2,19 +2,20 @@
 
 MicroBlaze에서 AXI4-Lite Custom Peripheral을 제어하고, FPGA에서 SPI/I2C 통신을 확인한 HW/SW 통합 프로젝트입니다.
 
-Vivado Block Design과 Custom RTL로 하드웨어 시스템을 구성했습니다. 현재 공개된 Vitis 실행 코드는 `CommTest` Application에서 GPIO 입력을 읽고 AXI-I2C Register에 제어값과 송신 데이터를 기록한 뒤, 상태 Register를 읽어 UART로 출력합니다.
+Vivado Block Design과 Custom RTL로 하드웨어 시스템을 구성했습니다. FPGA 보드의 FND에는 SPI 수신 데이터와 I2C 송신 데이터를 표시하고, Vitis의 UART 출력은 GPIO 입력과 I2C 내부 상태를 확인하는 디버그 로그로 사용했습니다.
 
-SPI는 `SPIMaster` Driver의 송신 데이터 기록·시작 제어 흐름과 기존 FPGA 동작 자료를 정리했습니다. AXI-I2C Custom IP의 Write/Read 데이터 경로는 별도의 UVM 환경에서 검증했습니다.
+AXI-SPI는 AXI Register의 8-bit 데이터를 SPI Mode 0으로 전송하고 MISO에서 수신한 데이터를 FND에 표시합니다. AXI-I2C는 GPIO 입력을 제어값과 송신 데이터로 사용하며, Write/Read 데이터 경로는 별도의 UVM 환경에서 검증했습니다.
 
 ## Project Highlights
 
 - MicroBlaze 기반 AXI4-Lite SoC 구성
 - AXI-SPI 및 AXI-I2C Master Custom Peripheral 구현
 - Memory-Mapped Register 기반 주변장치 제어
-- SPI Driver의 TX Data 기록 및 Start 제어 함수 구현
+- AXI-SPI Register 기반 8-bit 송수신 및 FND 결과 표시
 - GPIO 입력 기반 I2C Write Transaction 수행
 - I2C 상태 Register의 FSM·Busy·Done·ACK 확인
-- UART를 통한 GPIO 입력 및 I2C 상태 출력
+- FND를 통한 SPI 수신 데이터 및 I2C 송신 데이터 표시
+- Vitis UART를 통한 GPIO 입력 및 I2C 상태 디버깅
 - FPGA Master/Slave 통신 확인
 - AXI-I2C Write/Read 경로 UVM 검증
 - Scoreboard 자동 비교 및 Functional Coverage 수집
@@ -49,87 +50,62 @@ SPI와 I2C는 각각 별도의 Block Design으로 구현했습니다. 현재 `ma
 - **MicroBlaze**: Vitis C Application 실행 및 Memory-Mapped Register 접근
 - **GPIO8_0**: I2C로 전송할 8-bit Switch Data 입력
 - **GPIO8_1**: 상위 Bit를 이용한 I2C Transaction 시작 제어
+- **AXI-SPI Master**: AXI Register의 8-bit 데이터를 MOSI로 전송하고 MISO 수신 데이터 복원
 - **AXI-I2C Master**: 제어값을 I2C START·Address·Write Data·STOP 신호로 변환
-- **UART**: GPIO 입력값과 I2C 내부 상태를 디버깅 로그로 출력
-- **FND**: I2C Custom IP가 전달받은 송신 데이터를 FPGA에서 표시
+- **FND**: SPI Master 수신 데이터 또는 I2C 송신 데이터를 FPGA 보드에 표시
+- **UART**: Vitis에서 GPIO 입력값과 I2C 내부 상태를 확인하기 위한 디버그 로그 출력
 
-## AXI-SPI Software Interface
+## AXI-SPI Hardware Data Flow
 
-SPI Master Driver는 Base Address와 Register Offset을 이용해 송신 데이터 기록, 시작 제어 및 Register Read를 수행하도록 구성했습니다. [SPIMaster.c](./sw/Driver/SPIMaster/SPIMaster.c)와 [SPIMaster.h](./sw/Driver/SPIMaster/SPIMaster.h)에서 구현을 확인할 수 있습니다.
+AXI-SPI Custom IP는 AXI4-Lite Slave Register와 SPI Master RTL, FND Controller를 하나의 상위 Wrapper로 구성합니다. MicroBlaze가 `+0x00` Register에 기록한 하위 8-bit 값은 SPI 송신 데이터가 되고, MISO에서 복원한 수신 데이터는 FND에 표시됩니다.
 
-현재 공개된 `main.c`는 I2C `CommTest`를 실행합니다. 아래 SPI 흐름은 Application에서 `SPIMaster_SendByte()`를 호출했을 때 Driver가 수행하는 동작입니다.
+```mermaid
+flowchart LR
+    CPU["MicroBlaze"] -->|"AXI4-Lite Write"| REG0["SPI +0x00<br/>slv_reg0[7:0]"]
+    REG0 --> DATA["8-bit TX Data"]
+    DATA --> FSM["SPI Master FSM<br/>IDLE → START → DATA → STOP"]
+    FSM -->|"MOSI / SCLK / CS_n"| SLAVE["External SPI Slave"]
+    SLAVE -->|"MISO"| RX["8-bit RX Data"]
+    RX --> FND["FND Controller<br/>수신값 표시"]
+```
+
+SPI Master는 `CPOL=0`, `CPHA=0`의 Mode 0으로 동작하며 `clk_div=4`를 적용합니다. `CS_n`을 Low로 내린 뒤 송신 Shift Register의 MSB부터 MOSI로 출력하고, SCLK Edge에서 MISO를 8-bit 수신 Shift Register에 저장합니다. 전송이 끝나면 `CS_n`을 High로 복귀하고 수신값을 `master_rx_data`에 반영합니다.
 
 ### SPI RTL Files
 
-[원본 20260415_spi](https://github.com/chieftain4202/UVM/tree/04901941bf19e7796409032831991b8cc1ed3664/Project_2/20260415_spi)의 RTL을 로직 변경 없이 정리했습니다.
-
 | 파일 | 역할 |
 |---|---|
-| [SPI_master.sv](./rtl/spi/SPI_master.sv) | 송신 데이터 Shift, MISO 수신, SCLK 및 CS 제어 |
-| [SPI_slave.sv](./rtl/spi/SPI_slave.sv) | MOSI 수신 및 수신 데이터의 후속 전송 Echo 처리 |
-| [SPI_top.sv](./rtl/spi/SPI_top.sv) | Master·Slave·FND 연결과 버튼·스위치 제어 |
-| [fnd_controller.sv](./rtl/spi/fnd_controller.sv) | 수신 데이터 저장 및 FND 표시 |
+| [SPI_Master_v1_0.v](./rtl/custom-ip/spi-master/SPI_Master_v1_0.v) | AXI4-Lite Slave와 SPI Master/FND RTL을 연결하는 Custom IP 상위 Wrapper |
+| [SPI_Master_v1_0_S00_AXI.v](./rtl/custom-ip/spi-master/SPI_Master_v1_0_S00_AXI.v) | AXI4-Lite Write/Read Channel과 4개의 32-bit Slave Register 구현 |
+| [spi_master.sv](./rtl/custom-ip/spi-master/spi_master.sv) | SPI Mode 0 송수신 FSM, Clock Divider, Shift Register 및 FND 표시 구현 |
 
-`SPI_top`은 일반 SPI 동작을 확인하는 독립 Top입니다.
+### AXI-SPI Register Map
 
-### SPI Driver Functions
-
-| 함수 | 수행 동작 |
-|---|---|
-| `SPIMaster_Init()` | 전달받은 Base Address를 Driver Handle에 저장 |
-| `SPIMaster_WriteTxData()` | 8-bit 송신 데이터를 32-bit 값으로 변환하여 `Base + 0x00`에 기록 |
-| `SPIMaster_Start()` | `Base + 0x04`에 `1`을 기록하여 시작 제어 |
-| `SPIMaster_SendByte()` | 송신 데이터 기록 후 시작 제어를 순서대로 수행 |
-| `SPIMaster_ReadReg()` | 지정 Offset의 32-bit Register 값 반환 |
-
-
-### SPI Register Access Flow
-
-```mermaid
-flowchart TD
-    INIT["SPIMaster_Init()<br/>Base Address 저장"] --> CALL["Application에서<br/>SPIMaster_SendByte() 호출"]
-    CALL --> TX["SPIMaster_WriteTxData()"]
-    TX --> WRITE["Xil_Out32()<br/>Base + 0x00에 TX Data 기록"]
-    WRITE --> START["SPIMaster_Start()"]
-    START --> CONTROL["Xil_Out32()<br/>Base + 0x04에 1 기록"]
-    CONTROL --> RETURN["함수 반환"]
-
-    READ["SPIMaster_ReadReg()<br/>별도 호출"] --> MMIO["Xil_In32()<br/>Base + regOffset"]
-    MMIO --> VALUE["32-bit Register 값 반환"]
-```
-
-`SPIMaster_SendByte()`는 다음 두 호출로 구성됩니다.
-
-```c
-void SPIMaster_SendByte(SPIMaster_t *hspi, u8 txData) {
-    SPIMaster_WriteTxData(hspi, txData);
-    SPIMaster_Start(hspi);
-}
-```
-
-데이터를 먼저 기록한 뒤 시작 제어값을 기록합니다. 함수 내부에는 SPI 전송 완료 대기나 수신 데이터 비교가 없으므로, 함수 반환을 SPI 통신 완료로 해석하지 않습니다.
-
-### SPI Register Access Map
-
-아래 표는 공개된 C Driver의 접근 내용을 기준으로 정리했습니다.
-
-| Offset | Driver 접근 | 코드에서 확인되는 용도 |
+| Offset | 접근 | RTL에서 연결된 기능 |
 |---:|---|---|
-| `+0x00` | `Xil_Out32()` | 8-bit TX Data 기록 |
-| `+0x04` | `Xil_Out32()` | 시작 제어값 `1` 기록 |
-| `+0x08` | Offset 상수 정의 | 전용 제어 함수에서 사용하지 않음 |
-| `+0x0C` | Offset 상수 정의 | 전용 제어 함수에서 사용하지 않음 |
-| 지정 Offset | `Xil_In32()` | `SPIMaster_ReadReg()`를 통한 Register Read |
+| `+0x00` | Read/Write | `slv_reg0[7:0]`을 SPI TX Data로 전달 |
+| `+0x04` | Read/Write | 범용 `slv_reg1`, SPI 제어 로직에는 연결되지 않음 |
+| `+0x08` | Read/Write | 범용 `slv_reg2`, SPI 제어 로직에는 연결되지 않음 |
+| `+0x0C` | Read/Write | 범용 `slv_reg3`, SPI 제어 로직에는 연결되지 않음 |
 
-SPI Base Address는 `SPIMaster_Init()`의 인자로 전달합니다. 위 Offset은 SPI 구성에 해당하며, 현재 I2C의 Address Map과 구분됩니다.
+`SPI_Master_v1_0_S00_AXI`는 AXI Write Address와 Data를 수신해 선택된 Slave Register에 저장하고, Read 요청 시 같은 Register 값을 반환합니다. 실제 SPI 데이터 경로에는 `slv_reg0[7:0]`만 연결되어 있습니다.
 
-### SPI FPGA Integration
+### SPI Transfer Sequence
 
-기존 AXI-SPI 구성에서는 MicroBlaze가 AXI Register를 통해 SPI Master를 제어하고, Master와 Slave 사이의 통신 동작을 FPGA 보드에서 확인했습니다. Block Design 이미지와 보드 동작 자료는 각각 System Architecture와 FPGA Prototype 항목에 수록했습니다.
+| 순서 | 모듈 | 동작 |
+|---:|---|---|
+| 1 | MicroBlaze / AXI4-Lite | `+0x00` Register에 8-bit 송신 데이터 기록 |
+| 2 | `SPI_Master_v1_0_S00_AXI` | `slv_reg0[7:0]`을 `sw` 신호로 출력 |
+| 3 | `spi_master` | 송신 데이터를 Shift Register에 저장하고 `CS_n` 활성화 |
+| 4 | `SPI_master` FSM | SCLK에 맞춰 MOSI 송신과 MISO Sampling을 8회 수행 |
+| 5 | `SPI_master` FSM | 수신 데이터를 `master_rx_data`에 저장하고 `CS_n` 비활성화 |
+| 6 | `fnd_controller` | 수신한 8-bit 값을 10진수 Digit으로 분리해 FND에 표시 |
 
-`20260415_spi`의 일반 SPI RTL을 [`rtl/spi/`](./rtl/spi/)에 추가했습니다. SPI Driver는 [`sw/Driver/SPIMaster/`](./sw/Driver/SPIMaster/)에 있으며, 현재 공개 `design_1.bd`와 `main.c`는 I2C/GPIO 구성입니다. 가져온 SPI RTL에는 AXI Wrapper가 포함되어 있지 않으므로 AXI에 연결하려면 별도 Register Interface와 Block Design 연결이 필요합니다.
+현재 공개된 SPI RTL에서는 `slv_reg1`을 Start 신호로 사용하지 않고, SPI FSM의 IDLE/Busy 상태에 따라 전송을 진행합니다. 따라서 [SPIMaster.c](./sw/Driver/SPIMaster/SPIMaster.c)의 `+0x00` TX Data Write는 RTL과 대응하지만, `+0x04`에 기록하는 `SPIMaster_Start()`는 현재 공개된 RTL 제어 경로에는 연결되어 있지 않습니다. 공개된 `main.c`는 AXI-I2C `CommTest` 실행 경로이며 SPI Driver는 별도 소프트웨어 구현 자료로 보존했습니다.
 
-`SPIMaster_ReadReg()`는 범용 Register Read 함수입니다. 공개된 Driver만으로는 RX Data, Busy/Done Register 위치나 Start 자동 해제 여부를 확정할 수 없습니다. 이 저장소의 AXI UVM 결과는 별도 항목에 명시한 AXI-I2C 검증 결과입니다.
+### SPI FPGA Integration Result
+
+AXI-SPI 구성에서 MicroBlaze가 `slv_reg0[7:0]`에 기록한 데이터를 MOSI, SCLK, CS_n을 통해 외부 SPI Slave 보드로 전송했습니다. Slave가 MISO로 반환한 8-bit 데이터를 Master가 복원하고, 해당 수신값을 FPGA 보드의 FND에 표시하여 AXI Register 접근부터 SPI 물리 신호와 출력 장치까지 이어지는 동작을 확인했습니다.
 
 ## Current I2C Hardware/Software Control Flow
 
@@ -262,8 +238,10 @@ main.c
 
 ```text
 rtl/
-├─ custom-ip/          AXI-I2C 및 GPIO8 Custom IP
-├─ spi/                20260415 SPI Master/Slave/Top/FND RTL
+├─ custom-ip/
+│  ├─ spi-master/      AXI-SPI Wrapper, AXI4-Lite Register 및 SPI/FND RTL
+│  ├─ i2c-master/      AXI-I2C Wrapper, AXI4-Lite Register 및 I2C/FND RTL
+│  └─ gpio8/           AXI-GPIO8 Custom IP
 └─ uvm-design/         UVM 검증용 AXI-I2C RTL
 
 tb/
@@ -290,7 +268,7 @@ vivado/ip-package/     Custom IP Packaging Metadata
 
 현재 공개된 UVM Testbench는 보드에서 실행되는 `CommTest`와 분리된 검증 환경이며, `rtl/uvm-design`의 AXI-I2C Custom IP를 대상으로 Write/Read 데이터 경로를 검증합니다.
 
-이 AXI 프로젝트의 UVM 코드·로그·Coverage 자료는 **AXI-I2C에 대한 결과**입니다. `rtl/spi/`에 추가한 SPI RTL은 해당 UVM 검증 대상에 포함되지 않습니다.
+이 AXI 프로젝트의 UVM 코드·로그·Coverage 자료는 **AXI-I2C에 대한 결과**입니다. `rtl/custom-ip/spi-master/`의 AXI-SPI RTL은 해당 UVM 검증 대상에 포함되지 않습니다.
 
 ### Verification Scope
 
